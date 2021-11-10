@@ -167,9 +167,9 @@ app.post("/logout", (req, res) => {
 
 app.post("/register", (req, res) => {
   if (req.body.email === "" || req.body.password === "") {
-    console.log("Error: status code 400: invalid email or password");
+    res.status(404).send("Invalid email or password");
   } else if (emailCheck(req.body.email, users)) {
-    console.log("Error: status code 400: email already exists");
+    res.status(400).send("Email is already registered");
   } else {
     const newID = generateRandomString();
     users[newID] = {id: newID,
