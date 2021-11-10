@@ -20,9 +20,31 @@ const generateRandomString = function() {
   return result;
 };
 
+const emailCheck = function(email, users) {
+  for (let user in users) {
+    if (email === users[user]["email"]) {
+      return user;
+    }
+  }
+  return null;
+};
+
 const urlDatabase = {
   "b2xVn2": "http://www.lighthouselabs.ca",
   "9sm5xK": "http://www.google.com"
+};
+
+const users = {
+  "userRandomID": {
+    id: "userRandomID",
+    email: "user@example.com",
+    password: "purple-monkey-dinosaur"
+  },
+ "user2RandomID": {
+    id: "user2RandomID",
+    email: "user2@example.com",
+    password: "dishwasher-funk"
+  }
 };
 
 app.get("/", (req, res) => {
@@ -30,16 +52,17 @@ app.get("/", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const templateVars = { username: req.cookies["username"], urls: urlDatabase };
+  const templateVars = { user: users[req.cookies["user_id"]], urls: urlDatabase };
   res.render("urls_index", templateVars);
 });
 
 app.get("/urls/new", (req, res) => {
-  res.render("urls_new");
+  const templateVars = { user: users[req.cookies["user_id"]] };
+  res.render("urls_new", templateVars);
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { username: req.cookies["username"], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
+  const templateVars = { user: users[req.cookies["user_id"]], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
   res.render("urls_show", templateVars);
 });
 
@@ -49,6 +72,16 @@ app.get("/urls.json", (req, res) => {
 
 app.get("/hello", (req, res) => {
   res.send("<html><body>Hello <b>World</b></body></html>\n");
+});
+
+app.get("/register", (req, res) => {
+  const templateVars = { user: users[req.cookies["user_id"]] };
+  res.render("urls_register", templateVars);
+});
+
+app.get("/login", (req, res) => {
+  const templateVars = { user: users[req.cookies["user_id"]] };
+  res.render("urls_login", templateVars);
 });
 
 app.listen(PORT, () => {
@@ -72,13 +105,37 @@ app.post("/urls", (req, res) => {
 });
 
 app.post("/login", (req, res) => {
-  res.cookie('username', req.body.username);
-  res.redirect("/urls");
+  if (emailCheck(req.body.email, users)) {
+    const user = emailCheck(req.body.email, users);
+    if (req.body.password === users[user]["password"]) {
+      res.cookie("user_id", user);
+      res.redirect("urls");
+    } else {
+      console.log("Error: status code 403: invalid password");
+    }
+  } else {
+    console.log("Error: status code 403: email not registered");
+  }
 });
 
 app.post("/logout", (req, res) => {
-  res.clearCookie('username');
+  res.clearCookie('user_id');
   res.redirect("/urls");
+});
+
+app.post("/register", (req, res) => {
+  if (req.body.email === "" || req.body.password === "") {
+    console.log("Error: status code 400: invalid email or password");
+  } else if (emailCheck(req.body.email, users)) {
+    console.log("Error: status code 400: email already exists");
+  } else {
+    const newID = generateRandomString();
+    users[newID] = {id: newID,
+                    email: req.body.email,
+                    password: req.body.password};
+    res.cookie("user_id", newID);
+    res.redirect("/urls");
+  }
 });
 
 app.get("/u/:shortURL", (req, res) => {
