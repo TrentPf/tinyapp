@@ -10,11 +10,11 @@ app.use(cookieParser());
 
 app.set("view engine", "ejs");
 
-const usersURLs = function(user_id, urls) {
+const urlsForUser = function(userID) {
   let availableURLs = {};
-  for (let url in urls) {
-    if (user_id === urls[url].userID) {
-      availableURLs[url] = urls[url].longURL;
+  for (let url in urlDatabase) {
+    if (userID === urlDatabase[url].userID) {
+      availableURLs[url] = urlDatabase[url].longURL;
     }
   }
   return availableURLs;
@@ -52,7 +52,7 @@ const users = {
     email: "user@example.com",
     password: "purple-monkey-dinosaur"
   },
- "user2RandomID": {
+  "user2RandomID": {
     id: "user2RandomID",
     email: "user2@example.com",
     password: "dishwasher-funk"
@@ -65,7 +65,7 @@ app.get("/", (req, res) => {
 
 app.get("/urls", (req, res) => {
   const user = req.cookies["user_id"];
-  let userURLs = usersURLs(user, urlDatabase);
+  let userURLs = urlsForUser(user);
   const templateVars = { user: users[user], urls: userURLs };
   res.render("urls_index", templateVars);
 });
@@ -84,7 +84,8 @@ app.get("/urls/:shortURL", (req, res) => {
     console.log("Error: status code 400: shortURL does not exist");
     res.redirect("/urls");
   } else {
-    const templateVars = { user: users[req.cookies["user_id"]], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL]["longURL"] };
+    const user = req.cookies["user_id"];
+    let templateVars = { user: users[user], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL]["longURL"], userURL: urlDatabase[req.params.shortURL]["userID"] };
     res.render("urls_show", templateVars);
   }
 });
@@ -112,19 +113,31 @@ app.listen(PORT, () => {
 });
 
 app.post("/urls/:shortURL/delete", (req, res) => {
-  delete urlDatabase[req.params.shortURL];
-  res.redirect("/urls");
+  const user = req.cookies["user_id"];
+  if (urlDatabase[req.params.shortURL] && user === urlDatabase[req.params.shortURL].userID) {
+    delete urlDatabase[req.params.shortURL];
+    res.redirect("/urls");
+  } else {
+    console.log("You do not have permission to delete this URL");
+    res.redirect("/urls");
+  }
 });
 
 app.post("/urls/:id", (req, res) => {
-  urlDatabase[req.params.id] = { longURL: req.body.longURL,
-                                 userID: req.cookies["user_id"]};
-  res.redirect("/urls");
+  const user = req.cookies["user_id"];
+  if (urlDatabase[req.params.id] && user === urlDatabase[req.params.id].userID) {
+    urlDatabase[req.params.id] = { longURL: req.body.longURL,
+                                   userID: req.cookies["user_id"]};
+    res.redirect("/urls");
+  } else {
+    console.log("You do not have permission to edit this URL");
+    res.redirect("/urls");
+  }
 });
 
 app.post("/urls", (req, res) => {
   if (users[req.cookies["user_id"]] === undefined) {
-    console.log("Error: you cannot add a new url while not logged in to a registered account")
+    console.log("Error: you cannot add a new url while not logged in to a registered account");
   } else {
     const newShort = generateRandomString();
     urlDatabase[newShort] = { longURL: req.body.longURL,
