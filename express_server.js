@@ -10,6 +10,16 @@ app.use(cookieParser());
 
 app.set("view engine", "ejs");
 
+const usersURLs = function(user_id, urls) {
+  let availableURLs = {};
+  for (let url in urls) {
+    if (user_id === urls[url].userID) {
+      availableURLs[url] = urls[url].longURL;
+    }
+  }
+  return availableURLs;
+};
+
 const generateRandomString = function() {
   const randomChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = "";
@@ -30,8 +40,10 @@ const emailCheck = function(email, users) {
 };
 
 const urlDatabase = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
+  "b2xVn2": { longURL: "http://www.lighthouselabs.ca",
+              userID: "userRandomID" },
+  "9sm5xK": { longURL: "http://www.google.com",
+              userID: "user2RandomID" }
 };
 
 const users = {
@@ -52,18 +64,29 @@ app.get("/", (req, res) => {
 });
 
 app.get("/urls", (req, res) => {
-  const templateVars = { user: users[req.cookies["user_id"]], urls: urlDatabase };
+  const user = req.cookies["user_id"];
+  let userURLs = usersURLs(user, urlDatabase);
+  const templateVars = { user: users[user], urls: userURLs };
   res.render("urls_index", templateVars);
 });
 
 app.get("/urls/new", (req, res) => {
-  const templateVars = { user: users[req.cookies["user_id"]] };
-  res.render("urls_new", templateVars);
+  if (users[req.cookies["user_id"]] === undefined) {
+    res.redirect("/login");
+  } else {
+    const templateVars = { user: users[req.cookies["user_id"]] };
+    res.render("urls_new", templateVars);
+  }
 });
 
 app.get("/urls/:shortURL", (req, res) => {
-  const templateVars = { user: users[req.cookies["user_id"]], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL] };
-  res.render("urls_show", templateVars);
+  if (urlDatabase[req.params.shortURL] === undefined) {
+    console.log("Error: status code 400: shortURL does not exist");
+    res.redirect("/urls");
+  } else {
+    const templateVars = { user: users[req.cookies["user_id"]], shortURL: req.params.shortURL, longURL: urlDatabase[req.params.shortURL]["longURL"] };
+    res.render("urls_show", templateVars);
+  }
 });
 
 app.get("/urls.json", (req, res) => {
@@ -94,14 +117,20 @@ app.post("/urls/:shortURL/delete", (req, res) => {
 });
 
 app.post("/urls/:id", (req, res) => {
-  urlDatabase[req.params.id] = req.body.longURL;
+  urlDatabase[req.params.id] = { longURL: req.body.longURL,
+                                 userID: req.cookies["user_id"]};
   res.redirect("/urls");
 });
 
 app.post("/urls", (req, res) => {
-  const newShort = generateRandomString();
-  urlDatabase[newShort] = req.body.longURL;
-  res.redirect(`/urls/${newShort}`);
+  if (users[req.cookies["user_id"]] === undefined) {
+    console.log("Error: you cannot add a new url while not logged in to a registered account")
+  } else {
+    const newShort = generateRandomString();
+    urlDatabase[newShort] = { longURL: req.body.longURL,
+                              userID: req.cookies["user_id"] };
+    res.redirect(`/urls/${newShort}`);
+  }
 });
 
 app.post("/login", (req, res) => {
@@ -139,6 +168,11 @@ app.post("/register", (req, res) => {
 });
 
 app.get("/u/:shortURL", (req, res) => {
-  const longURL = urlDatabase[req.params.shortURL];
-  res.redirect(longURL);
+  if (urlDatabase[req.params.shortURL] === undefined) {
+    console.log("Error: status code 400: shortURL does not exist");
+    res.redirect("/urls");
+  } else {
+    const longURL = urlDatabase[req.params.shortURL].longURL;
+    res.redirect(longURL);
+  }
 });
